@@ -1,0 +1,30 @@
+[project]
+name = "SEOUL-LOCAL-JOURNEY"
+version = "0.1.0"
+description = "서울시 공공데이터 공모전 프로젝트입니다."
+requires-python = ">=3.12"
+
+dependencies = [
+    "python-dotenv",
+    "langchain",
+    "langchain-openai",
+    "langgraph",
+    "langchain-mcp-adapters",
+    "langchain-community",
+    "langchain-elasticsearch",
+    "mcp[cli]",
+    "pandas",
+    "numpy",
+    "nest_asyncio",
+    "Flask",
+    "Flask-sqlalchemy",
+    "flask-cors",
+    "werkzeug",
+    "gunicorn",
+    "pyyaml",
+    "sqlalchemy",
+    "aiomysql",
+    "cryptography",
+    "pymysql",
+    "sqlalchemy"
+]
