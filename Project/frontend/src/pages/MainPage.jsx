@@ -1,0 +1,639 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+export default function MainPage() {
+  const navigate = useNavigate()
+
+  const [query, setQuery] = useState('')
+  const [budget, setBudget] = useState(70000)
+  const [travelType, setTravelType] = useState('혼자 여행')
+  const [duration, setDuration] = useState('1일')
+  const [showPlanner, setShowPlanner] = useState(false)
+  const [selectedTags, setSelectedTags] = useState([])
+  const [selectedThemes, setSelectedThemes] = useState([])
+  const [currentUser, setCurrentUser] = useState(null)
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser))
+      } catch (error) {
+        localStorage.removeItem('user')
+      }
+    }
+  }, [])
+
+  const themes = [
+    {
+      key: 'drama',
+      title: 'K-드라마 감성',
+      emoji: '🎬',
+      desc: '드라마 속 주인공처럼 걷고 싶은 하루',
+      image:
+        'https://images.unsplash.com/photo-1517154421773-0529f29ea451?auto=format&fit=crop&w=900&q=80',
+    },
+    {
+      key: 'kpop',
+      title: 'K-팝 & 트렌드',
+      emoji: '🎧',
+      desc: '핫플, 팝업, 트렌디한 서울 무드',
+      image:
+        'https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&w=900&q=80',
+    },
+    {
+      key: 'food',
+      title: '로컬 미식 탐방',
+      emoji: '🍜',
+      desc: '현지 느낌 가득한 서울 맛집 코스',
+      image:
+        'https://images.unsplash.com/photo-1553163147-622ab57be1c7?auto=format&fit=crop&w=900&q=80',
+    },
+    {
+      key: 'beauty',
+      title: '뷰티 & 쇼핑',
+      emoji: '🛍️',
+      desc: '올리브영, 성수, 뷰티 스팟까지 한 번에',
+      image:
+        'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80',
+    },
+    {
+      key: 'walk',
+      title: '조용한 산책',
+      emoji: '🌿',
+      desc: '복잡함을 피해 여유롭게 걷는 서울',
+      image:
+        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=80',
+    },
+  ]
+
+  const quickTags = ['혼자 여행', '커플 여행', '야경', '저예산', '성수', '홍대', '명동', '비 오는 날']
+  const travelTypes = ['혼자 여행', '커플 여행', '친구/가족 여행']
+  const durations = ['1일', '3일', '직접 입력']
+
+  const features = [
+    {
+      title: 'AI 취향 분석',
+      desc: '자연어 입력을 바탕으로 여행 의도와 분위기를 해석합니다.',
+    },
+    {
+      title: '추가 조건 보완',
+      desc: '여행 유형, 일정, 예산을 간단하게 보완 입력합니다.',
+    },
+    {
+      title: '맞춤 코스 추천',
+      desc: '최종적으로 서울 맞춤 일정과 대체 코스를 추천합니다.',
+    },
+  ]
+
+  const mergedQuery = useMemo(() => {
+    const tagText = selectedTags.length > 0 ? selectedTags.join(', ') : ''
+    const themeText =
+      selectedThemes.length > 0
+        ? selectedThemes
+            .map((key) => themes.find((theme) => theme.key === key)?.title)
+            .filter(Boolean)
+            .join(', ')
+        : ''
+
+    return [query, tagText, themeText].filter(Boolean).join(' / ')
+  }, [query, selectedTags, selectedThemes])
+
+  const toggleTag = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
+    )
+  }
+
+  const toggleTheme = (themeKey) => {
+    setSelectedThemes((prev) =>
+      prev.includes(themeKey) ? prev.filter((item) => item !== themeKey) : [...prev, themeKey],
+    )
+  }
+
+  const requireLoginAndOpenPlanner = () => {
+    if (!currentUser) {
+      alert('로그인이 필요합니다.')
+      navigate('/login')
+      return
+    }
+
+    if (!query.trim() && selectedTags.length === 0 && selectedThemes.length === 0) {
+      alert('먼저 빠른 취향 입력 또는 태그/테마를 선택해주세요.')
+      return
+    }
+
+    setShowPlanner(true)
+
+    setTimeout(() => {
+      const section = document.getElementById('planner')
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 50)
+  }
+
+  const handleTextareaKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      requireLoginAndOpenPlanner()
+    }
+  }
+
+  const handleFinalRecommend = () => {
+    if (!currentUser) {
+      alert('로그인이 필요합니다.')
+      navigate('/login')
+      return
+    }
+
+    const payload = {
+      user_id: currentUser?.id,
+      query_text: query,
+      merged_query: mergedQuery,
+      selected_tags: selectedTags,
+      selected_themes: selectedThemes,
+      travel_type: travelType,
+      duration,
+      budget,
+    }
+
+    console.log('추천 요청 payload:', payload)
+
+    alert(
+      `추천 요청 준비 완료\n\n사용자: ${currentUser?.name}\n취향: ${mergedQuery || query}\n여행 유형: ${travelType}\n기간: ${duration}\n예산: ${budget.toLocaleString()}원`,
+    )
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    setCurrentUser(null)
+    setShowPlanner(false)
+    alert('로그아웃되었습니다.')
+    navigate('/')
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xl font-black tracking-tight text-blue-700">Seoul Like Local</p>
+            <p className="text-xs text-slate-500">AI 기반 서울 맞춤 로컬 관광 추천</p>
+          </div>
+
+          <nav className="hidden items-center gap-8 md:flex">
+            <a href="#intro" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+              서비스 소개
+            </a>
+            <a href="#theme" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+              취향 선택
+            </a>
+            <a href="#recommend" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+              추천 방식
+            </a>
+          </nav>
+
+          {!currentUser ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/login')}
+                className="hidden rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:block"
+              >
+                로그인
+              </button>
+              <button
+                onClick={() => navigate('/signup')}
+                className="rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+              >
+                회원가입
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="hidden rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 sm:block">
+                환영합니다, {currentUser.name}님
+              </div>
+              <button
+                onClick={handleLogout}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                로그아웃
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main>
+        <section id="intro" className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-pink-500 opacity-95" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.18),transparent_28%)]" />
+
+          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-24">
+            <div className="flex flex-col justify-center text-white">
+              <span className="mb-4 inline-flex w-fit rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
+                외국인을 위한 서울 일상관광 AI 서비스
+              </span>
+
+              <h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+                취향으로 찾는
+                <br />
+                진짜 서울 여행
+              </h1>
+
+              <p className="mt-6 max-w-xl text-base leading-7 text-white/85 sm:text-lg">
+                K-콘텐츠, 로컬 맛집, 감성 산책, 쇼핑 취향까지 반영해 관광지가 아닌{' '}
+                <span className="font-bold text-white">나에게 맞는 서울 코스</span>를 추천합니다.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={requireLoginAndOpenPlanner}
+                  className="rounded-2xl bg-white px-6 py-4 text-base font-bold text-blue-700 transition hover:scale-[1.02]"
+                >
+                  지금 추천받기
+                </button>
+                <button className="rounded-2xl border border-white/30 bg-white/10 px-6 py-4 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20">
+                  서비스 소개 보기
+                </button>
+              </div>
+
+              <div className="mt-10 grid grid-cols-3 gap-4 sm:max-w-lg">
+                <div className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                  <p className="text-2xl font-black">AI</p>
+                  <p className="mt-1 text-sm text-white/75">취향 분석</p>
+                </div>
+                <div className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                  <p className="text-2xl font-black">맞춤</p>
+                  <p className="mt-1 text-sm text-white/75">여행 코스</p>
+                </div>
+                <div className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                  <p className="text-2xl font-black">서울</p>
+                  <p className="mt-1 text-sm text-white/75">로컬 경험</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-xl rounded-[28px] border border-white/30 bg-white/90 p-5 shadow-2xl shadow-black/10 backdrop-blur sm:p-6">
+                <div className="rounded-[24px] bg-slate-50 p-5 sm:p-6">
+                  <div className="mb-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-blue-600">오늘 서울을 어떻게 보내고 싶나요?</p>
+                      <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">빠른 취향 입력</h2>
+                    </div>
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                      STEP 1
+                    </span>
+                  </div>
+
+                  <textarea
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleTextareaKeyDown}
+                    className="h-32 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm outline-none ring-0 placeholder:text-slate-400 focus:border-blue-500"
+                    placeholder="예: 성수 감성 카페, 야경, 올리브영 쇼핑, 1일 코스, 선재업고튀어 나온 촬영장소 가고싶어"
+                  />
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {quickTags.map((tag) => {
+                      const active = selectedTags.includes(tag)
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                            active
+                              ? 'border-blue-600 bg-blue-600 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700'
+                          }`}
+                        >
+                          #{tag}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button
+                    onClick={requireLoginAndOpenPlanner}
+                    className="mt-6 flex w-full items-center justify-center rounded-2xl bg-blue-600 px-5 py-4 text-base font-bold text-white transition hover:bg-blue-700"
+                  >
+                    AI 추천 코스 생성하기
+                  </button>
+
+                  {!currentUser ? (
+                    <p className="mt-3 text-center text-xs font-medium text-red-400">
+                      추천 기능은 로그인 후 이용할 수 있습니다.
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-center text-xs text-slate-400">
+                      Enter를 누르면 다음 단계로 넘어갑니다. 줄바꿈은 Shift + Enter
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="theme" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+          <div className="mb-10 text-center">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">취향 테마 선택</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              원하는 서울의 분위기를 골라보세요
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-slate-600">
+              빠른 취향 입력 전에 참고용으로 테마를 고를 수 있고, 선택한 정보는 다음 단계로 함께 전달됩니다.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-5">
+            {themes.map((theme) => {
+              const active = selectedThemes.includes(theme.key)
+
+              return (
+                <button
+                  key={theme.key}
+                  type="button"
+                  onClick={() => toggleTheme(theme.key)}
+                  className={`group overflow-hidden rounded-[24px] bg-white text-left shadow-sm ring-1 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
+                    active ? 'ring-blue-500' : 'ring-slate-200'
+                  }`}
+                >
+                  <div className="relative aspect-[4/5] overflow-hidden">
+                    <img
+                      src={theme.image}
+                      alt={theme.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+                    {active && (
+                      <div className="absolute right-4 top-4 rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+                        선택됨
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
+                      <div className="mb-2 text-2xl">{theme.emoji}</div>
+                      <h3 className="text-xl font-extrabold">{theme.title}</h3>
+                      <p className="mt-2 text-sm text-white/80">{theme.desc}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        {showPlanner && currentUser && (
+          <section id="planner" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+            <div className="rounded-[32px] bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8 lg:p-10">
+              <div className="mb-8">
+                <div className="mb-3 inline-flex rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700">
+                  STEP 2
+                </div>
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">추가 정보 입력</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                  여행 스타일과 예산을 한 번에 설정하세요
+                </h2>
+                <p className="mt-3 text-slate-600">
+                  먼저 입력한 취향을 바탕으로, 추천 정확도를 높이기 위한 추가 조건을 입력합니다.
+                </p>
+              </div>
+
+              <div className="mb-6 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                <p className="text-xs font-semibold text-slate-500">현재 입력된 취향</p>
+                <p className="mt-2 text-base font-semibold text-slate-900 break-words">
+                  {mergedQuery || '입력된 취향이 없습니다.'}
+                </p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-4">
+                  <div className="h-full rounded-[28px] bg-slate-50 p-6 ring-1 ring-slate-200">
+                    <p className="text-sm font-bold text-blue-600">여행 유형</p>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                      누구와 함께하시나요?
+                    </h3>
+
+                    <div className="mt-6 space-y-3">
+                      {travelTypes.map((item) => {
+                        const active = travelType === item
+                        return (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setTravelType(item)}
+                            className={`flex w-full items-center justify-between rounded-2xl border px-5 py-5 text-left transition ${
+                              active
+                                ? 'border-blue-200 bg-blue-50'
+                                : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'
+                            }`}
+                          >
+                            <span className="text-lg font-semibold text-slate-800">{item}</span>
+                            <span
+                              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                                active ? 'border-blue-500 bg-blue-500' : 'border-slate-400'
+                              }`}
+                            >
+                              <span
+                                className={`h-3 w-3 rounded-full bg-white ${
+                                  active ? 'opacity-100' : 'opacity-0'
+                                }`}
+                              />
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-8">
+                  <div className="h-full rounded-[28px] bg-slate-50 p-6 ring-1 ring-slate-200">
+                    <div className="flex flex-col gap-8">
+                      <div>
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-blue-600">여행 기간</p>
+                            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                              일정은 얼마나 되나요?
+                            </h3>
+                          </div>
+
+                          <div className="grid w-full grid-cols-3 rounded-full bg-slate-200 p-1 text-sm font-bold text-slate-600 xl:w-auto xl:min-w-[360px]">
+                            {durations.map((item) => {
+                              const active = duration === item
+                              return (
+                                <button
+                                  key={item}
+                                  type="button"
+                                  onClick={() => setDuration(item)}
+                                  className={`rounded-full px-5 py-3 transition ${
+                                    active
+                                      ? 'bg-white text-blue-700 shadow-sm'
+                                      : 'text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  {item}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[24px] bg-white p-5 ring-1 ring-slate-200">
+                        <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-blue-600">예산 설정</p>
+                            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                              하루 예산은 어느 정도인가요?
+                            </h3>
+                          </div>
+
+                          <div className="text-left md:text-right">
+                            <p className="text-xs font-semibold text-slate-500">예상 일일 기준</p>
+                            <p className="text-3xl font-black text-blue-700 sm:text-4xl">
+                              {budget.toLocaleString()}원
+                            </p>
+                          </div>
+                        </div>
+
+                        <input
+                          type="range"
+                          min="30000"
+                          max="1000000"
+                          step="10000"
+                          value={budget}
+                          onChange={(e) => setBudget(Number(e.target.value))}
+                          className="w-full accent-blue-600"
+                        />
+
+                        <div className="mt-2 flex justify-between text-xs font-semibold text-slate-400">
+                          <span>가성비</span>
+                          <span>프리미엄</span>
+                        </div>
+
+                        <div className="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-3">
+                          <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                            <p className="text-xs font-semibold text-slate-500">선택된 여행 유형</p>
+                            <p className="mt-2 text-lg font-bold text-slate-900">{travelType}</p>
+                          </div>
+                          <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                            <p className="text-xs font-semibold text-slate-500">선택된 일정</p>
+                            <p className="mt-2 text-lg font-bold text-slate-900">{duration}</p>
+                          </div>
+                          <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                            <p className="text-xs font-semibold text-slate-500">예상 예산</p>
+                            <p className="mt-2 text-lg font-bold text-slate-900">
+                              {budget.toLocaleString()}원
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={handleFinalRecommend}
+                          className="flex-1 rounded-2xl bg-blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-blue-700"
+                        >
+                          최종 추천 받기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowPlanner(false)}
+                          className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-base font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          이전 단계로
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section id="recommend" className="bg-slate-100/80 py-16 lg:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-10 text-center">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">추천 방식</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                이렇게 추천이 만들어집니다
+              </h2>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              {features.map((feature, idx) => (
+                <div key={feature.title} className="rounded-[24px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-lg font-black text-blue-700">
+                    0{idx + 1}
+                  </div>
+                  <h3 className="text-xl font-black tracking-tight text-slate-900">{feature.title}</h3>
+                  <p className="mt-3 leading-7 text-slate-600">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+          <div className="overflow-hidden rounded-[32px] bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-14">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/70">지금 바로 시작</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+                  관광지가 아닌,
+                  <br className="hidden sm:block" />
+                  나만의 서울을 추천받아보세요.
+                </h2>
+                <p className="mt-4 max-w-2xl text-white/85">
+                  빠른 취향 입력 후 추가 조건을 보완하는 2단계 흐름으로, 훨씬 자연스러운 사용자 경험을
+                  제공합니다.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={requireLoginAndOpenPlanner}
+                  className="rounded-2xl bg-white px-6 py-4 font-bold text-blue-700 transition hover:scale-[1.02]"
+                >
+                  코스 추천 받기
+                </button>
+                <button className="rounded-2xl border border-white/30 bg-white/10 px-6 py-4 font-semibold text-white backdrop-blur transition hover:bg-white/20">
+                  데모 보기
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div>
+            <p className="text-lg font-black text-slate-900">Seoul Like Local</p>
+            <p className="mt-1 text-sm text-slate-500">AI 기반 외국인 맞춤형 서울 일상관광 추천 플랫폼</p>
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+            <a href="#" className="hover:text-blue-600">
+              개인정보처리방침
+            </a>
+            <a href="#" className="hover:text-blue-600">
+              이용약관
+            </a>
+            <a href="#" className="hover:text-blue-600">
+              문의하기
+            </a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}
