@@ -8,6 +8,7 @@ export default function MainPage() {
   const [budget, setBudget] = useState(70000)
   const [travelType, setTravelType] = useState('혼자 여행')
   const [duration, setDuration] = useState('1일')
+  const [customDuration, setCustomDuration] = useState('')
   const [showPlanner, setShowPlanner] = useState(false)
   const [selectedTags, setSelectedTags] = useState([])
   const [selectedThemes, setSelectedThemes] = useState([])
@@ -15,6 +16,8 @@ export default function MainPage() {
 
   const [loading, setLoading] = useState(false)
   const [recommendError, setRecommendError] = useState('')
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0)
+  const [progressValue, setProgressValue] = useState(8)
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
@@ -26,6 +29,31 @@ export default function MainPage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStepIndex(0)
+      setProgressValue(8)
+      return
+    }
+
+    const stepInterval = setInterval(() => {
+      setLoadingStepIndex((prev) => (prev + 1) % loadingMessages.length)
+    }, 2200)
+
+    const progressInterval = setInterval(() => {
+      setProgressValue((prev) => {
+        if (prev >= 92) return prev
+        const next = prev + Math.random() * 12
+        return Math.min(next, 92)
+      })
+    }, 900)
+
+    return () => {
+      clearInterval(stepInterval)
+      clearInterval(progressInterval)
+    }
+  }, [loading])
 
   const themes = [
     {
@@ -89,6 +117,56 @@ export default function MainPage() {
     },
   ]
 
+  const loadingMessages = [
+    {
+      title: '취향과 여행 목적을 분석하고 있어요',
+      desc: '입력한 키워드에서 원하는 분위기와 서울의 무드를 해석하고 있습니다.',
+    },
+    {
+      title: '날씨와 지역 특성을 반영하고 있어요',
+      desc: '오늘의 서울 날씨와 지역 특성을 고려해 실내·야외 동선을 조정하고 있습니다.',
+    },
+    {
+      title: '예산에 맞는 흐름을 설계하고 있어요',
+      desc: '무리 없이 즐길 수 있도록 예산과 이동 흐름을 함께 맞추고 있습니다.',
+    },
+    {
+      title: '대체 코스까지 준비하고 있어요',
+      desc: '비가 오거나 혼잡할 때를 대비한 대안도 함께 구성하고 있습니다.',
+    },
+  ]
+
+  const loadingTips = [
+    '팁: 성수와 서울숲은 함께 묶으면 이동 동선이 좋아요.',
+    '팁: 비 오는 날은 실내 전시, 카페, 복합문화공간 조합이 만족도가 높아요.',
+    '팁: 야경 코스는 해진 뒤 1~2시간대를 중심으로 잡으면 분위기가 가장 좋아요.',
+  ]
+
+  const previewMoments = [
+    {
+      time: '11:00',
+      title: '감성 카페 후보 탐색 중',
+      desc: '입력한 분위기와 예산에 맞는 첫 장소를 고르고 있어요.',
+    },
+    {
+      time: '14:00',
+      title: '산책 또는 쇼핑 동선 조정 중',
+      desc: '이동이 자연스럽고 날씨에 잘 맞는 흐름을 설계하고 있어요.',
+    },
+    {
+      time: '18:00',
+      title: '야경/저녁 포인트 조합 중',
+      desc: '하루 마무리 분위기가 좋아지는 포인트를 고르고 있어요.',
+    },
+  ]
+
+  const finalDuration = useMemo(() => {
+    if (duration === '직접 입력') {
+      return customDuration.trim()
+    }
+    return duration
+  }, [duration, customDuration])
+
   const mergedQuery = useMemo(() => {
     const tagText = selectedTags.length > 0 ? selectedTags.join(', ') : ''
     const themeText =
@@ -99,8 +177,16 @@ export default function MainPage() {
             .join(', ')
         : ''
 
-    return [query, tagText, themeText].filter(Boolean).join(' / ')
-  }, [query, selectedTags, selectedThemes])
+    const durationText = finalDuration ? `일정: ${finalDuration}` : ''
+
+    return [query, tagText, themeText, durationText].filter(Boolean).join(' / ')
+  }, [query, selectedTags, selectedThemes, themes, finalDuration])
+
+  const activeThemeTitles = useMemo(() => {
+    return selectedThemes
+      .map((key) => themes.find((theme) => theme.key === key)?.title)
+      .filter(Boolean)
+  }, [selectedThemes, themes])
 
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
@@ -143,10 +229,22 @@ export default function MainPage() {
     }
   }
 
+  const handleDurationChange = (value) => {
+    setDuration(value)
+    if (value !== '직접 입력') {
+      setCustomDuration('')
+    }
+  }
+
   const handleFinalRecommend = async () => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
       navigate('/login')
+      return
+    }
+
+    if (duration === '직접 입력' && !customDuration.trim()) {
+      alert('직접 입력한 일정을 작성해주세요.')
       return
     }
 
@@ -157,7 +255,7 @@ export default function MainPage() {
       selected_tags: selectedTags,
       selected_themes: selectedThemes,
       travel_type: travelType,
-      duration,
+      duration: finalDuration || duration,
       budget,
     }
 
@@ -182,10 +280,13 @@ export default function MainPage() {
         throw new Error(data.message || '추천 생성에 실패했습니다.')
       }
 
+      setProgressValue(100)
+
       navigate('/recommend-result', {
         state: {
           resultData: data.result,
           requestInfo: payload,
+          weatherData: data.weather,
         },
       })
     } catch (error) {
@@ -208,6 +309,146 @@ export default function MainPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      {loading && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/70 px-4 py-8 backdrop-blur-md">
+          <div className="mx-auto flex min-h-full max-w-5xl items-center justify-center">
+            <div className="w-full overflow-hidden rounded-[36px] bg-white shadow-2xl ring-1 ring-slate-200">
+              <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-500 px-6 py-8 text-white sm:px-8 sm:py-10">
+                <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+                <div className="absolute bottom-0 right-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+
+                <div className="relative">
+                  <div className="inline-flex rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
+                    AI가 서울 코스를 설계 중입니다
+                  </div>
+
+                  <div className="mt-5 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div>
+                      <h3 className="text-3xl font-black tracking-tight sm:text-4xl">
+                        {loadingMessages[loadingStepIndex].title}
+                      </h3>
+                      <p className="mt-3 max-w-2xl text-sm leading-7 text-white/85 sm:text-base">
+                        {loadingMessages[loadingStepIndex].desc}
+                      </p>
+
+                      <div className="mt-6">
+                        <div className="mb-2 flex items-center justify-between text-xs font-semibold text-white/80">
+                          <span>추천 생성 진행률</span>
+                          <span>{Math.round(progressValue)}%</span>
+                        </div>
+                        <div className="h-3 w-full overflow-hidden rounded-full bg-white/20">
+                          <div
+                            className="h-full rounded-full bg-white transition-all duration-700 ease-out"
+                            style={{ width: `${progressValue}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] bg-white/10 p-5 backdrop-blur">
+                      <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/80">입력 요약</p>
+                      <div className="mt-4 space-y-3 text-sm">
+                        <div className="rounded-2xl bg-white/10 px-4 py-3">
+                          <p className="text-white/70">여행 유형</p>
+                          <p className="mt-1 text-lg font-bold text-white">{travelType}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/10 px-4 py-3">
+                          <p className="text-white/70">일정</p>
+                          <p className="mt-1 text-lg font-bold text-white">{finalDuration || duration}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/10 px-4 py-3">
+                          <p className="text-white/70">예산</p>
+                          <p className="mt-1 text-lg font-bold text-white">{budget.toLocaleString()}원</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-6 px-6 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1fr_1fr]">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">AI 미리보기</p>
+                  <div className="mt-4 space-y-3">
+                    {previewMoments.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`rounded-[24px] p-4 ring-1 transition ${
+                          idx === loadingStepIndex % previewMoments.length
+                            ? 'bg-blue-50 ring-blue-200'
+                            : 'bg-slate-50 ring-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-blue-700 ring-1 ring-slate-200">
+                            {item.time}
+                          </div>
+                          <div>
+                            <p className="text-lg font-black text-slate-900">{item.title}</p>
+                            <p className="mt-1 text-sm leading-6 text-slate-600">{item.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-semibold text-slate-500">현재 입력된 취향</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
+                      {mergedQuery || '입력된 취향이 없습니다.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-[28px] bg-slate-50 p-5 ring-1 ring-slate-200">
+                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">선택한 테마</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {activeThemeTitles.length > 0 ? (
+                        activeThemeTitles.map((themeTitle, idx) => (
+                          <span
+                            key={idx}
+                            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
+                          >
+                            {themeTitle}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+                          선택된 테마 없음
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] bg-slate-50 p-5 ring-1 ring-slate-200">
+                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">서울 여행 팁</p>
+                    <div className="mt-4 space-y-3">
+                      {loadingTips.map((tip, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-700 ring-1 ring-slate-200"
+                        >
+                          {tip}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-5 text-white">
+                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/70">지금 만드는 중</p>
+                    <p className="mt-3 text-lg font-black">날씨, 예산, 분위기를 함께 반영한 서울 맞춤 코스</p>
+                    <p className="mt-2 text-sm leading-6 text-white/80">
+                      사용자의 입력을 바탕으로 실제로 코스를 조합하고 있어요. 잠시만 기다려 주세요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div>
@@ -504,7 +745,7 @@ export default function MainPage() {
                                 <button
                                   key={item}
                                   type="button"
-                                  onClick={() => setDuration(item)}
+                                  onClick={() => handleDurationChange(item)}
                                   className={`rounded-full px-5 py-3 transition ${
                                     active
                                       ? 'bg-white text-blue-700 shadow-sm'
@@ -517,6 +758,24 @@ export default function MainPage() {
                             })}
                           </div>
                         </div>
+
+                        {duration === '직접 입력' && (
+                          <div className="mt-4">
+                            <label className="mb-2 block text-sm font-semibold text-slate-700">
+                              원하는 일정을 직접 입력해주세요
+                            </label>
+                            <input
+                              type="text"
+                              value={customDuration}
+                              onChange={(e) => setCustomDuration(e.target.value)}
+                              placeholder="예: 반나절, 2박 3일, 저녁 6시~밤 10시"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500"
+                            />
+                            <p className="mt-2 text-xs text-slate-500">
+                              자유롭게 입력하면 추천 코스에 그대로 반영됩니다.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="rounded-[24px] bg-white p-5 ring-1 ring-slate-200">
@@ -558,7 +817,7 @@ export default function MainPage() {
                           </div>
                           <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                             <p className="text-xs font-semibold text-slate-500">선택된 일정</p>
-                            <p className="mt-2 text-lg font-bold text-slate-900">{duration}</p>
+                            <p className="mt-2 text-lg font-bold text-slate-900">{finalDuration || duration}</p>
                           </div>
                           <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                             <p className="text-xs font-semibold text-slate-500">예상 예산</p>
@@ -578,7 +837,7 @@ export default function MainPage() {
                             loading ? 'cursor-not-allowed bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
                           }`}
                         >
-                          {loading ? '추천 생성 중...' : '최종 추천 받기'}
+                          {loading ? 'AI가 코스를 설계 중입니다...' : '최종 추천 받기'}
                         </button>
                         <button
                           type="button"
@@ -592,18 +851,6 @@ export default function MainPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-        )}
-
-        {loading && (
-          <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-            <div className="rounded-[28px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-              <p className="text-sm font-bold text-blue-600">AI 추천 생성 중</p>
-              <h3 className="mt-2 text-2xl font-black text-slate-900">서울 맞춤 코스를 만드는 중입니다...</h3>
-              <p className="mt-3 text-slate-600">
-                입력한 취향, 예산, 일정 정보를 바탕으로 가장 어울리는 흐름을 설계하고 있어요.
-              </p>
             </div>
           </section>
         )}
