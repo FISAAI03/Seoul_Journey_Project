@@ -4,22 +4,47 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.engine import URL
+from dotenv import load_dotenv
+from openai import OpenAI
 import os
+import json
+import re
+import requests
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = URL.create(
     drivername="mysql+pymysql",
-    username=os.getenv('DB_USER'),
-    password=os.getenv('DB_PASSWORD'),
-    host=os.getenv('DB_HOST'),
-    port=int(os.getenv('DB_PORT')),
-    database="main"
+    username=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=int(os.getenv("DB_PORT")),
+    database="main",
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+# 서버 시작 시 바로 OpenAI 클라이언트를 만들지 않음
+# 키 문제로 서버 부팅이 죽는 상황 방지
+client = None
+
+
+def get_openai_client():
+    global client
+
+    if client is not None:
+        return client
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    client = OpenAI(api_key=api_key)
+    return client
 
 
 class User(db.Model):
@@ -32,9 +57,280 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+THEME_MAP = {
+    "drama": "K-드라마 감성",
+    "kpop": "K-팝 & 트렌드",
+    "food": "로컬 미식 탐방",
+    "beauty": "뷰티 & 쇼핑",
+    "walk": "조용한 산책",
+}
+
+SEOUL_DISTRICT_COORDS = {
+    "성수": {"name": "Seongsu-dong, Seoul", "latitude": 37.5447, "longitude": 127.0557},
+    "홍대": {"name": "Hongdae, Seoul", "latitude": 37.5563, "longitude": 126.9220},
+    "명동": {"name": "Myeong-dong, Seoul", "latitude": 37.5636, "longitude": 126.9834},
+    "강남": {"name": "Gangnam, Seoul", "latitude": 37.4979, "longitude": 127.0276},
+    "잠실": {"name": "Jamsil, Seoul", "latitude": 37.5133, "longitude": 127.1002},
+    "여의도": {"name": "Yeouido, Seoul", "latitude": 37.5219, "longitude": 126.9245},
+    "서울숲": {"name": "Seoul Forest, Seoul", "latitude": 37.5444, "longitude": 127.0374},
+    "익선동": {"name": "Ikseon-dong, Seoul", "latitude": 37.5743, "longitude": 126.9893},
+    "북촌": {"name": "Bukchon, Seoul", "latitude": 37.5826, "longitude": 126.9830},
+    "한강": {"name": "Han River, Seoul", "latitude": 37.5284, "longitude": 126.9327},
+}
+
+
+def clean_json_text(text: str) -> str:
+    if not text:
+        return ""
+
+    text = text.strip()
+    text = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def build_user_summary(data: dict) -> dict:
+    selected_theme_titles = [
+        THEME_MAP.get(theme_key, theme_key)
+        for theme_key in data.get("selected_themes", [])
+    ]
+
+    return {
+        "query_text": (data.get("query_text") or "").strip(),
+        "selected_tags": data.get("selected_tags", []),
+        "selected_themes": selected_theme_titles,
+        "travel_type": data.get("travel_type", "혼자 여행"),
+        "duration": data.get("duration", "1일"),
+        "budget": data.get("budget", 70000),
+    }
+
+
+def extract_target_area(data: dict) -> str:
+    query_text = (data.get("query_text") or "").strip()
+    selected_tags = data.get("selected_tags") or []
+    merged = " ".join([query_text] + selected_tags)
+
+    for area in SEOUL_DISTRICT_COORDS.keys():
+        if area in merged:
+            return area
+
+    return "서울"
+
+
+def geocode_location(query: str):
+    url = "https://geocoding-api.open-meteo.com/v1/search"
+    params = {
+        "name": query,
+        "count": 1,
+        "language": "ko",
+        "format": "json",
+    }
+
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    results = data.get("results") or []
+    if not results:
+        return None
+
+    first = results[0]
+    return {
+        "name": first.get("name"),
+        "latitude": first.get("latitude"),
+        "longitude": first.get("longitude"),
+        "country": first.get("country"),
+        "admin1": first.get("admin1"),
+    }
+
+
+def resolve_location(area: str) -> dict:
+    if area in SEOUL_DISTRICT_COORDS:
+        return SEOUL_DISTRICT_COORDS[area]
+
+    if area == "서울":
+        return {
+            "name": "Seoul",
+            "latitude": 37.5665,
+            "longitude": 126.9780,
+        }
+
+    geo = geocode_location(f"{area}, Seoul")
+    if geo:
+        return geo
+
+    return {
+        "name": "Seoul",
+        "latitude": 37.5665,
+        "longitude": 126.9780,
+    }
+
+
+def fetch_weather(latitude: float, longitude: float) -> dict:
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": "Asia/Seoul",
+        "current": "temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m",
+        "hourly": "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code",
+        "forecast_days": 1,
+    }
+
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def summarize_weather(weather_data: dict) -> dict:
+    current = weather_data.get("current", {})
+    hourly = weather_data.get("hourly", {})
+
+    precipitation_probs = hourly.get("precipitation_probability", [])[:12]
+    temps = hourly.get("temperature_2m", [])[:12]
+
+    max_pop = max(precipitation_probs) if precipitation_probs else 0
+    max_temp = max(temps) if temps else current.get("temperature_2m")
+    min_temp = min(temps) if temps else current.get("temperature_2m")
+
+    current_temp = current.get("temperature_2m")
+    apparent_temp = current.get("apparent_temperature")
+    wind_speed = current.get("wind_speed_10m")
+    weather_code = current.get("weather_code")
+
+    rain_risk = "높음" if max_pop >= 60 else "보통" if max_pop >= 30 else "낮음"
+
+    if max_pop >= 60:
+        recommendation_mode = "실내 중심"
+    elif current_temp is not None and current_temp >= 30:
+        recommendation_mode = "실내 + 저녁 중심"
+    elif current_temp is not None and current_temp <= 5:
+        recommendation_mode = "짧은 야외 + 실내 중심"
+    else:
+        recommendation_mode = "야외 포함 가능"
+
+    return {
+        "current_temperature": current_temp,
+        "apparent_temperature": apparent_temp,
+        "wind_speed": wind_speed,
+        "weather_code": weather_code,
+        "max_precipitation_probability": max_pop,
+        "max_temp_today": max_temp,
+        "min_temp_today": min_temp,
+        "rain_risk": rain_risk,
+        "recommendation_mode": recommendation_mode,
+    }
+
+
+def build_weather_context(data: dict) -> dict:
+    area = extract_target_area(data)
+    location = resolve_location(area)
+    weather_raw = fetch_weather(location["latitude"], location["longitude"])
+    weather_summary = summarize_weather(weather_raw)
+
+    return {
+        "target_area": area,
+        "resolved_location": location,
+        "weather_summary": weather_summary,
+    }
+
+
+def build_prompt(user_input: dict, weather_context: dict) -> str:
+    return f"""
+너는 서울 로컬 여행 코스를 설계하는 AI 플래너다.
+
+사용자 입력과 날씨 정보를 바탕으로 서울에서 실제로 경험할 법한 하루 또는 단기 여행 코스를 추천하라.
+과장된 표현보다 자연스럽고 설득력 있는 추천을 제공하라.
+반드시 예산, 여행 유형, 분위기, 일정 길이, 날씨 조건을 반영하라.
+
+중요 규칙:
+1. 반드시 JSON만 반환하라.
+2. 마크다운, 설명문, 코드블록 없이 JSON만 반환하라.
+3. 장소명은 지나치게 단정하지 말고, "성수 감성 카페", "한강공원 야경 스팟"처럼 일반화된 형태도 허용한다.
+4. 전체 추천은 사용자의 예산 범위를 최대한 존중하라.
+5. 결과는 관광지 나열이 아니라 흐름 있는 일정이어야 한다.
+6. 출력 언어는 한국어로 하라.
+7. 날씨가 나쁘면 실내 중심으로 조정하라.
+8. 강수확률이 높으면 야외 일정을 줄이고 대체 실내 코스를 강화하라.
+9. 더위, 추위, 강풍이 심하면 장시간 야외 일정을 피하라.
+10. 사용자가 선택한 여행 유형, 기간, 예산을 반드시 반영하라.
+
+반환 JSON 스키마:
+{{
+  "summary": "전체 코스 한 줄 요약",
+  "travel_style": "사용자 여행 스타일 해석",
+  "itinerary": [
+    {{
+      "time": "11:00",
+      "title": "장소/구간 이름",
+      "category": "카페/산책/쇼핑/식사/야경 등",
+      "reason": "왜 이 장소가 사용자와 날씨에 맞는지",
+      "estimated_cost": 12000,
+      "tips": "간단 팁"
+    }}
+  ],
+  "total_estimated_cost": 0,
+  "budget_comment": "예산에 대한 짧은 설명",
+  "tips": [
+    "추가 팁 1",
+    "추가 팁 2"
+  ],
+  "alternative_plan": [
+    {{
+      "time": "15:00",
+      "title": "대체 장소/구간",
+      "category": "실내 대체",
+      "reason": "왜 대체안으로 적절한지",
+      "estimated_cost": 10000,
+      "tips": "간단 팁"
+    }}
+  ]
+}}
+
+사용자 입력:
+{json.dumps(user_input, ensure_ascii=False, indent=2)}
+
+날씨 정보:
+{json.dumps(weather_context, ensure_ascii=False, indent=2)}
+""".strip()
+
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({
+        "success": True,
+        "message": "backend is running"
+    }), 200
+
+
+@app.route("/api/weather-preview", methods=["POST"])
+def weather_preview():
+    try:
+        data = request.get_json() or {}
+        weather_context = build_weather_context(data)
+
+        return jsonify({
+            "success": True,
+            "weather": weather_context,
+        }), 200
+    except requests.RequestException as e:
+        return jsonify({
+            "success": False,
+            "message": "날씨 정보를 불러오는 중 오류가 발생했습니다.",
+            "error": str(e)
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "날씨 미리보기 생성 중 오류가 발생했습니다.",
+            "error": str(e)
+        }), 500
+
+
 @app.route("/api/auth/signup", methods=["POST"])
 def signup():
-    data = request.get_json()
+    data = request.get_json() or {}
 
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
@@ -83,7 +379,7 @@ def signup():
 
 @app.route("/api/auth/login", methods=["POST"])
 def login():
-    data = request.get_json()
+    data = request.get_json() or {}
 
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -119,7 +415,73 @@ def login():
     }), 200
 
 
+@app.route("/api/recommend", methods=["POST"])
+def recommend():
+    try:
+        data = request.get_json() or {}
+
+        query_text = (data.get("query_text") or "").strip()
+        selected_tags = data.get("selected_tags") or []
+        selected_themes = data.get("selected_themes") or []
+
+        if not query_text and not selected_tags and not selected_themes:
+            return jsonify({
+                "success": False,
+                "message": "취향 입력 또는 태그/테마 중 하나 이상은 필요합니다."
+            }), 400
+
+        client = get_openai_client()
+        if not client:
+            return jsonify({
+                "success": False,
+                "message": "OPENAI_API_KEY가 설정되어 있지 않습니다."
+            }), 500
+
+        user_input = build_user_summary(data)
+        weather_context = build_weather_context(data)
+        prompt = build_prompt(user_input, weather_context)
+
+        response = client.responses.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            input=prompt,
+        )
+
+        raw_text = response.output_text
+        cleaned_text = clean_json_text(raw_text)
+
+        try:
+            result = json.loads(cleaned_text)
+        except json.JSONDecodeError:
+            return jsonify({
+                "success": False,
+                "message": "모델 응답을 JSON으로 해석하지 못했습니다.",
+                "raw_response": raw_text
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "message": "추천 생성 완료",
+            "input": user_input,
+            "weather": weather_context,
+            "result": result
+        }), 200
+
+    except requests.RequestException as e:
+        return jsonify({
+            "success": False,
+            "message": "날씨 정보를 불러오는 중 오류가 발생했습니다.",
+            "error": str(e)
+        }), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "추천 생성 중 오류가 발생했습니다.",
+            "error": str(e)
+        }), 500
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

@@ -13,6 +13,9 @@ export default function MainPage() {
   const [selectedThemes, setSelectedThemes] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
 
+  const [loading, setLoading] = useState(false)
+  const [recommendError, setRecommendError] = useState('')
+
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
     if (savedUser) {
@@ -140,7 +143,7 @@ export default function MainPage() {
     }
   }
 
-  const handleFinalRecommend = () => {
+  const handleFinalRecommend = async () => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
       navigate('/login')
@@ -158,17 +161,47 @@ export default function MainPage() {
       budget,
     }
 
-    console.log('추천 요청 payload:', payload)
+    try {
+      setLoading(true)
+      setRecommendError('')
 
-    alert(
-      `추천 요청 준비 완료\n\n사용자: ${currentUser?.name}\n취향: ${mergedQuery || query}\n여행 유형: ${travelType}\n기간: ${duration}\n예산: ${budget.toLocaleString()}원`,
-    )
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
+      const res = await fetch(`${apiBase}/api/recommend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+      console.log('recommend response:', data)
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || '추천 생성에 실패했습니다.')
+      }
+
+      navigate('/recommend-result', {
+        state: {
+          resultData: data.result,
+          requestInfo: payload,
+        },
+      })
+    } catch (error) {
+      console.error('추천 요청 실패:', error)
+      setRecommendError(error.message || '추천 생성 중 오류가 발생했습니다.')
+      alert(error.message || '추천 생성 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleLogout = () => {
     localStorage.removeItem('user')
     setCurrentUser(null)
     setShowPlanner(false)
+    setRecommendError('')
     alert('로그아웃되었습니다.')
     navigate('/')
   }
@@ -406,7 +439,7 @@ export default function MainPage() {
 
               <div className="mb-6 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
                 <p className="text-xs font-semibold text-slate-500">현재 입력된 취향</p>
-                <p className="mt-2 text-base font-semibold text-slate-900 break-words">
+                <p className="mt-2 break-words text-base font-semibold text-slate-900">
                   {mergedQuery || '입력된 취향이 없습니다.'}
                 </p>
               </div>
@@ -540,9 +573,12 @@ export default function MainPage() {
                         <button
                           type="button"
                           onClick={handleFinalRecommend}
-                          className="flex-1 rounded-2xl bg-blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-blue-700"
+                          disabled={loading}
+                          className={`flex-1 rounded-2xl px-6 py-4 text-base font-bold text-white transition ${
+                            loading ? 'cursor-not-allowed bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
-                          최종 추천 받기
+                          {loading ? '추천 생성 중...' : '최종 추천 받기'}
                         </button>
                         <button
                           type="button"
@@ -556,6 +592,27 @@ export default function MainPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {loading && (
+          <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+            <div className="rounded-[28px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
+              <p className="text-sm font-bold text-blue-600">AI 추천 생성 중</p>
+              <h3 className="mt-2 text-2xl font-black text-slate-900">서울 맞춤 코스를 만드는 중입니다...</h3>
+              <p className="mt-3 text-slate-600">
+                입력한 취향, 예산, 일정 정보를 바탕으로 가장 어울리는 흐름을 설계하고 있어요.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {recommendError && (
+          <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+            <div className="rounded-[28px] border border-red-200 bg-red-50 p-6">
+              <p className="text-lg font-bold text-red-700">추천 생성 실패</p>
+              <p className="mt-2 text-red-600">{recommendError}</p>
             </div>
           </section>
         )}
