@@ -1,11 +1,86 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLanguage } from '../i18n/LanguageContext'
+import LanguageToggle from '../components/LanguageToggle'
 
 export default function MyTripsPage() {
   const navigate = useNavigate()
+  const { language, t } = useLanguage()
+  const isKo = language === 'ko'
+
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const copy = useMemo(
+    () => ({
+      ko: {
+        pageSubtitle: '내 여행 보관함',
+        main: '메인으로',
+        heroBadge: 'My Trips',
+        heroTitle: '내 여행 보관함',
+        heroDesc:
+          '지금까지 추천받은 서울 코스를 다시 확인하고, 마음에 드는 여행을 다시 열어볼 수 있어요.',
+        loginRequired: '로그인이 필요합니다.',
+        invalidLogin: '로그인 정보가 올바르지 않습니다. 다시 로그인해주세요.',
+        invalidUser: '사용자 정보가 올바르지 않습니다. 다시 로그인해주세요.',
+        invalidResponse: '서버 응답 형식이 올바르지 않습니다.',
+        loadFailDefault: '보관함을 불러오지 못했습니다.',
+        loadError: '보관함 조회 중 오류가 발생했습니다.',
+        loadingTitle: '보관함을 불러오는 중입니다...',
+        loadingDesc: '저장된 추천 코스를 정리하고 있어요.',
+        failTitle: '불러오기 실패',
+        backMain: '메인으로 돌아가기',
+        emptyTitle: '아직 저장된 여행이 없습니다.',
+        emptyDesc: '메인 페이지에서 코스를 추천받으면 이곳에 저장됩니다.',
+        goRecommend: '추천받으러 가기',
+        savedTrip: 'Saved Trip',
+        defaultTitle: '서울 추천 코스',
+        travelType: '여행 유형',
+        duration: '일정',
+        budget: '예산',
+        createdAt: '생성일',
+        tasteInput: '취향 입력',
+        detail: '상세 보기 →',
+        remix: 'AI 재구성',
+        won: '원',
+      },
+      en: {
+        pageSubtitle: 'My Trips',
+        main: 'Main',
+        heroBadge: 'My Trips',
+        heroTitle: 'My saved trips',
+        heroDesc:
+          'Review your saved Seoul itineraries and reopen your favorite recommendations anytime.',
+        loginRequired: 'Please log in first.',
+        invalidLogin: 'Your login information is invalid. Please log in again.',
+        invalidUser: 'Your user information is invalid. Please log in again.',
+        invalidResponse: 'The server response format is invalid.',
+        loadFailDefault: 'Failed to load your trip library.',
+        loadError: 'An error occurred while loading your trip library.',
+        loadingTitle: 'Loading your trip library...',
+        loadingDesc: 'Organizing your saved AI itineraries.',
+        failTitle: 'Failed to load',
+        backMain: 'Back to main',
+        emptyTitle: 'No saved trips yet.',
+        emptyDesc: 'Create an itinerary on the main page and it will be saved here.',
+        goRecommend: 'Get a recommendation',
+        savedTrip: 'Saved Trip',
+        defaultTitle: 'Recommended Seoul Itinerary',
+        travelType: 'Travel type',
+        duration: 'Duration',
+        budget: 'Budget',
+        createdAt: 'Created at',
+        tasteInput: 'Preference input',
+        detail: 'View detail →',
+        remix: 'AI Remix',
+        won: 'KRW',
+      },
+    }),
+    [],
+  )
+
+  const txt = copy[language] || copy.ko
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -16,7 +91,7 @@ export default function MyTripsPage() {
         const user = localStorage.getItem('user')
 
         if (!user) {
-          alert('로그인이 필요합니다.')
+          alert(txt.loginRequired)
           navigate('/login')
           return
         }
@@ -27,14 +102,14 @@ export default function MyTripsPage() {
         } catch (parseError) {
           console.error('user parse error:', parseError)
           localStorage.removeItem('user')
-          alert('로그인 정보가 올바르지 않습니다. 다시 로그인해주세요.')
+          alert(txt.invalidLogin)
           navigate('/login')
           return
         }
 
         if (!parsedUser?.id) {
           localStorage.removeItem('user')
-          alert('사용자 정보가 올바르지 않습니다. 다시 로그인해주세요.')
+          alert(txt.invalidUser)
           navigate('/login')
           return
         }
@@ -47,87 +122,102 @@ export default function MyTripsPage() {
           data = await res.json()
         } catch (jsonError) {
           console.error('response json parse error:', jsonError)
-          throw new Error('서버 응답 형식이 올바르지 않습니다.')
+          throw new Error(txt.invalidResponse)
         }
 
         if (!res.ok || !data.success) {
-          throw new Error(data.message || '보관함을 불러오지 못했습니다.')
+          throw new Error(data.message || txt.loadFailDefault)
         }
 
         setTrips(Array.isArray(data.trips) ? data.trips : [])
       } catch (err) {
         console.error('MyTripsPage error:', err)
-        setError(err.message || '보관함 조회 중 오류가 발생했습니다.')
+        setError(err.message || txt.loadError)
       } finally {
         setLoading(false)
       }
     }
 
     fetchTrips()
-  }, [navigate])
+  }, [navigate, txt])
+
+  const handleOpenDetail = (tripId) => {
+    navigate(`/trip/${tripId}`)
+  }
+
+  const handleOpenRemix = (e, tripId) => {
+    e.stopPropagation()
+    navigate(`/trip/${tripId}/refine`)
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
           <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">Seoul Like Local</p>
-            <p className="text-xs text-slate-500">내 여행 보관함</p>
+            <p className="text-xl font-black tracking-tight text-blue-700">
+              {t.appName || 'Seoul Like Local'}
+            </p>
+            <p className="text-xs text-slate-500">{txt.pageSubtitle}</p>
           </div>
 
           <div className="flex items-center gap-3">
+            <LanguageToggle />
+
             <button
               onClick={() => navigate('/')}
               className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
             >
-              메인으로
+              {txt.main}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <section className="mb-8">
           <div className="rounded-[32px] bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-500 px-6 py-10 text-white sm:px-10">
             <p className="inline-flex rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
-              My Trips
+              {txt.heroBadge}
             </p>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">내 여행 보관함</h1>
+            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+              {txt.heroTitle}
+            </h1>
             <p className="mt-3 max-w-2xl text-white/85">
-              지금까지 추천받은 서울 코스를 다시 확인하고, 마음에 드는 여행을 다시 열어볼 수 있어요.
+              {txt.heroDesc}
             </p>
           </div>
         </section>
 
         {loading && (
           <div className="rounded-[28px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-            <p className="text-lg font-bold text-slate-900">보관함을 불러오는 중입니다...</p>
-            <p className="mt-2 text-slate-600">저장된 추천 코스를 정리하고 있어요.</p>
+            <p className="text-lg font-bold text-slate-900">{txt.loadingTitle}</p>
+            <p className="mt-2 text-slate-600">{txt.loadingDesc}</p>
           </div>
         )}
 
         {!loading && error && (
           <div className="rounded-[28px] border border-red-200 bg-red-50 p-6">
-            <p className="text-lg font-bold text-red-700">불러오기 실패</p>
+            <p className="text-lg font-bold text-red-700">{txt.failTitle}</p>
             <p className="mt-2 text-red-600">{error}</p>
             <button
               onClick={() => navigate('/')}
               className="mt-5 rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700"
             >
-              메인으로 돌아가기
+              {txt.backMain}
             </button>
           </div>
         )}
 
         {!loading && !error && trips.length === 0 && (
           <div className="rounded-[28px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-            <p className="text-lg font-bold text-slate-900">아직 저장된 여행이 없습니다.</p>
-            <p className="mt-2 text-slate-600">메인 페이지에서 코스를 추천받으면 이곳에 저장됩니다.</p>
+            <p className="text-lg font-bold text-slate-900">{txt.emptyTitle}</p>
+            <p className="mt-2 text-slate-600">{txt.emptyDesc}</p>
             <button
               onClick={() => navigate('/')}
               className="mt-6 rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700"
             >
-              추천받으러 가기
+              {txt.goRecommend}
             </button>
           </div>
         )}
@@ -135,19 +225,18 @@ export default function MyTripsPage() {
         {!loading && !error && trips.length > 0 && (
           <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {trips.map((trip) => (
-              <button
+              <article
                 key={trip.id}
-                type="button"
-                onClick={() => navigate(`/trip/${trip.id}`)}
-                className="overflow-hidden rounded-[28px] bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
+                onClick={() => handleOpenDetail(trip.id)}
+                className="cursor-pointer overflow-hidden rounded-[28px] bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
-                      Saved Trip
+                      {txt.savedTrip}
                     </p>
                     <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900">
-                      {trip.title || '서울 추천 코스'}
+                      {trip.title || txt.defaultTitle}
                     </h2>
                   </div>
 
@@ -158,39 +247,59 @@ export default function MyTripsPage() {
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-semibold text-slate-500">여행 유형</p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{trip.travel_type || '-'}</p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-semibold text-slate-500">일정</p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{trip.duration || '-'}</p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-semibold text-slate-500">예산</p>
+                    <p className="text-xs font-semibold text-slate-500">{txt.travelType}</p>
                     <p className="mt-2 text-sm font-bold text-slate-900">
-                      {Number(trip.budget || 0).toLocaleString()}원
+                      {trip.travel_type || '-'}
                     </p>
                   </div>
 
                   <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-semibold text-slate-500">생성일</p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{trip.created_at || '-'}</p>
+                    <p className="text-xs font-semibold text-slate-500">{txt.duration}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">
+                      {trip.duration || '-'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-xs font-semibold text-slate-500">{txt.budget}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">
+                      {Number(trip.budget || 0).toLocaleString()} {txt.won}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-xs font-semibold text-slate-500">{txt.createdAt}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">
+                      {trip.created_at || '-'}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4">
-                  <p className="text-xs font-semibold text-slate-500">취향 입력</p>
+                  <p className="text-xs font-semibold text-slate-500">{txt.tasteInput}</p>
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">
                     {trip.query_text || '-'}
                   </p>
                 </div>
 
-                <div className="mt-5 inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
-                  상세 보기 →
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDetail(trip.id)}
+                    className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                  >
+                    {txt.detail}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenRemix(e, trip.id)}
+                    className="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
+                  >
+                    {txt.remix}
+                  </button>
                 </div>
-              </button>
+              </article>
             ))}
           </section>
         )}

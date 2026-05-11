@@ -5,6 +5,7 @@ import SignupPage from './pages/SignupPage'
 import ResultPage from './pages/ResultPage'
 import MyTripsPage from './pages/MyTripsPage'
 import TripDetailPage from './pages/TripDetailPage'
+import RefineTripPage from './pages/RefineTripPage'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/recommend-result" element={<ResultPage />} />
       <Route path="/my-trips" element={<MyTripsPage />} />
       <Route path="/trip/:id" element={<TripDetailPage />} />
+      <Route path="/trip/:id/refine" element={<RefineTripPage />} />
     </Routes>
   )
 }

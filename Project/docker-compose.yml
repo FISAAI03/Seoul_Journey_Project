@@ -24,11 +24,11 @@ services:
     container_name: service-backend
     tty: true
     ports:
-      - 5000:5000
+      - 5002:5002
     volumes:
       - ./backend:/workspace
     # command: uvicorn app.main:app --host 0.0.0.0 --reload --log-level debug
-    command: ["uv", "run", "gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--timeout", "120", "run:app", "--reload", "--access-logfile", "-"]
+    command: ["uv", "run", "gunicorn", "-w", "2", "-b", "0.0.0.0:5002", "--timeout", "120", "run:app", "--reload", "--access-logfile", "-"]
 
   cloudflared:
     image: cloudflare/cloudflared:latest
