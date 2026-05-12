@@ -6,12 +6,47 @@ import LanguageToggle from '../components/LanguageToggle'
 export default function TripDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { language, t } = useLanguage()
+  const { language } = useLanguage()
   const isKo = language === 'ko'
+  const logoText = 'Seoul Life Travel'
 
   const [trip, setTrip] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const getApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL
+
+    if (envBase) {
+      return envBase.replace(/\/$/, '')
+    }
+
+    return window.location.origin
+  }
+
+  const parseJsonResponse = async (res) => {
+    const contentType = res.headers.get('content-type') || ''
+    const text = await res.text()
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `API가 JSON이 아닌 응답을 반환했습니다. status=${res.status}, body=${text.slice(0, 120)}`,
+      )
+    }
+
+    return JSON.parse(text)
+  }
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
 
   const txt = useMemo(
     () => ({
@@ -150,12 +185,12 @@ export default function TripDetailPage() {
         setLoading(true)
         setError('')
 
-        const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+        const apiBase = getApiBase()
         const res = await fetch(`${apiBase}/api/trip/${id}`)
-        const data = await res.json()
+        const data = await parseJsonResponse(res)
 
         if (!res.ok || !data.success) {
-          throw new Error(data.message || copy.defaultLoadError)
+          throw new Error(data.message || data.error || copy.defaultLoadError)
         }
 
         setTrip(data.trip)
@@ -176,12 +211,17 @@ export default function TripDetailPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">
-              {t.appName || 'Seoul Like Local'}
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
             </p>
             <p className="text-xs text-slate-500">{copy.pageSubtitle}</p>
-          </div>
+          </button>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
             <LanguageToggle />
@@ -371,7 +411,9 @@ export default function TripDetailPage() {
                             </div>
 
                             <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                              {item.title || item.place_name || (isKo ? '서울 추천 장소' : 'Recommended place')}
+                              {item.title ||
+                                item.place_name ||
+                                (isKo ? '서울 추천 장소' : 'Recommended place')}
                             </h3>
 
                             <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -433,7 +475,8 @@ export default function TripDetailPage() {
                 )}
 
                 <p className="mt-4 text-lg font-black text-slate-900">
-                  {copy.totalEstimatedCost}: {Number(trip.result.total_estimated_cost || 0).toLocaleString()} {copy.won}
+                  {copy.totalEstimatedCost}:{' '}
+                  {Number(trip.result.total_estimated_cost || 0).toLocaleString()} {copy.won}
                 </p>
               </section>
             )}
@@ -480,7 +523,8 @@ export default function TripDetailPage() {
 
                         <p className="mt-3 text-slate-700">{item.reason}</p>
                         <p className="mt-3 text-sm font-semibold text-slate-900">
-                          {copy.estimatedCost}: {Number(item.estimated_cost || 0).toLocaleString()} {copy.won}
+                          {copy.estimatedCost}:{' '}
+                          {Number(item.estimated_cost || 0).toLocaleString()} {copy.won}
                         </p>
                         <p className="mt-1 text-sm text-slate-600">
                           {copy.tip}: {item.tips || '-'}

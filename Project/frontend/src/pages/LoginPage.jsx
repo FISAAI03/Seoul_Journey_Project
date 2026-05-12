@@ -7,6 +7,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { language, t } = useLanguage()
   const isKo = language === 'ko'
+  const logoText = 'Seoul Life Travel'
 
   const [form, setForm] = useState({
     email: '',
@@ -17,9 +18,43 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
+  const getApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL
+
+    if (envBase) {
+      return envBase.replace(/\/$/, '')
+    }
+
+    return window.location.origin
+  }
+
+  const parseJsonResponse = async (res) => {
+    const contentType = res.headers.get('content-type') || ''
+    const text = await res.text()
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `API가 JSON이 아닌 응답을 반환했습니다. status=${res.status}, body=${text.slice(0, 120)}`,
+      )
+    }
+
+    return JSON.parse(text)
+  }
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
+
   const loginText = {
     ko: {
-      sideBadge: 'Seoul Like Local',
+      sideBadge: 'Seoul Life Travel',
       sideTitleLine1: '다시 오신 걸',
       sideTitleLine2: '환영합니다',
       sideDesc:
@@ -46,7 +81,7 @@ export default function LoginPage() {
       signup: '회원가입',
     },
     en: {
-      sideBadge: 'Seoul Like Local',
+      sideBadge: 'Seoul Life Travel',
       sideTitleLine1: 'Welcome',
       sideTitleLine2: 'back',
       sideDesc:
@@ -78,6 +113,7 @@ export default function LoginPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
+
     setForm((prev) => ({
       ...prev,
       [name]: value,
@@ -97,7 +133,8 @@ export default function LoginPage() {
     try {
       setLoading(true)
 
-      const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+      const apiBase = getApiBase()
+
       const response = await fetch(`${apiBase}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -109,10 +146,10 @@ export default function LoginPage() {
         }),
       })
 
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       if (!response.ok) {
-        setError(data.message || txt.defaultError)
+        setError(data.message || data.error || txt.defaultError)
         return
       }
 
@@ -123,7 +160,8 @@ export default function LoginPage() {
         navigate('/')
       }, 800)
     } catch (err) {
-      setError(txt.serverError)
+      console.error('login error:', err)
+      setError(err.message || txt.serverError)
     } finally {
       setLoading(false)
     }
@@ -136,9 +174,17 @@ export default function LoginPage() {
           <div className="hidden flex-col justify-between bg-gradient-to-br from-blue-600 via-indigo-600 to-pink-500 p-10 text-white lg:flex">
             <div>
               <div className="flex items-center justify-between gap-4">
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/70">
-                  {txt.sideBadge}
-                </p>
+                <button
+                  type="button"
+                  onClick={handleLogoClick}
+                  className="group text-left"
+                  aria-label="Go to home"
+                >
+                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/70 transition group-hover:text-white">
+                    {logoText}
+                  </p>
+                </button>
+
                 <div className="rounded-full bg-white/95 p-1">
                   <LanguageToggle />
                 </div>
@@ -150,9 +196,7 @@ export default function LoginPage() {
                 {txt.sideTitleLine2}
               </h1>
 
-              <p className="mt-6 max-w-md text-white/85">
-                {txt.sideDesc}
-              </p>
+              <p className="mt-6 max-w-md text-white/85">{txt.sideDesc}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -160,10 +204,12 @@ export default function LoginPage() {
                 <p className="text-xl font-black">{txt.featureAi}</p>
                 <p className="mt-1 text-sm text-white/80">{txt.featureAiDesc}</p>
               </div>
+
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                 <p className="text-xl font-black">{txt.featureTrip}</p>
                 <p className="mt-1 text-sm text-white/80">{txt.featureTripDesc}</p>
               </div>
+
               <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                 <p className="text-xl font-black">{txt.featureRecommend}</p>
                 <p className="mt-1 text-sm text-white/80">{txt.featureRecommendDesc}</p>
@@ -175,12 +221,23 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
               <div className="mb-8">
                 <div className="mb-5 flex items-center justify-between gap-3 lg:hidden">
-                  <div>
-                    <p className="text-lg font-black text-blue-700">{t.appName || 'Seoul Like Local'}</p>
-                    <p className="text-xs text-slate-500">
-                      {t.appSubtitle || (isKo ? 'AI 기반 서울 맞춤 로컬 관광 추천' : 'AI-powered local Seoul travel planner')}
+                  <button
+                    type="button"
+                    onClick={handleLogoClick}
+                    className="group text-left"
+                    aria-label="Go to home"
+                  >
+                    <p className="text-lg font-black text-blue-700 transition group-hover:text-blue-800">
+                      {logoText}
                     </p>
-                  </div>
+                    <p className="text-xs text-slate-500">
+                      {t.appSubtitle ||
+                        (isKo
+                          ? 'AI 기반 서울 맞춤 로컬 관광 추천'
+                          : 'AI-powered local Seoul travel planner')}
+                    </p>
+                  </button>
+
                   <LanguageToggle />
                 </div>
 
@@ -195,9 +252,7 @@ export default function LoginPage() {
                   {txt.title}
                 </h2>
 
-                <p className="mt-2 text-slate-500">
-                  {txt.desc}
-                </p>
+                <p className="mt-2 text-slate-500">{txt.desc}</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -205,6 +260,7 @@ export default function LoginPage() {
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
                     {txt.email}
                   </label>
+
                   <input
                     type="email"
                     name="email"
@@ -219,6 +275,7 @@ export default function LoginPage() {
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
                     {txt.password}
                   </label>
+
                   <input
                     type="password"
                     name="password"

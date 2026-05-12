@@ -23,6 +23,18 @@ export default function MainPage() {
   const [progressValue, setProgressValue] = useState(8)
 
   const isKo = language === 'ko'
+  const logoText = 'Seoul Life Travel'
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
 
   const getApiBase = () => {
     const envBase = import.meta.env.VITE_API_BASE_URL
@@ -49,6 +61,7 @@ export default function MainPage() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
+
     if (savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser))
@@ -309,6 +322,7 @@ export default function MainPage() {
     if (duration === '직접 입력' || duration === 'Custom') {
       return customDuration.trim()
     }
+
     return duration
   }, [duration, customDuration])
 
@@ -381,6 +395,7 @@ export default function MainPage() {
 
   const handleDurationChange = (value) => {
     setDuration(value)
+
     if (value !== '직접 입력' && value !== 'Custom') {
       setCustomDuration('')
     }
@@ -392,6 +407,7 @@ export default function MainPage() {
       navigate('/login')
       return
     }
+
     navigate('/my-trips')
   }
 
@@ -500,12 +516,16 @@ export default function MainPage() {
 
       setRecommendError(
         error.message ||
-          (isKo ? '추천 생성 중 오류가 발생했습니다.' : 'An error occurred while generating the recommendation.'),
+          (isKo
+            ? '추천 생성 중 오류가 발생했습니다.'
+            : 'An error occurred while generating the recommendation.'),
       )
 
       alert(
         error.message ||
-          (isKo ? '추천 생성 중 오류가 발생했습니다.' : 'An error occurred while generating the recommendation.'),
+          (isKo
+            ? '추천 생성 중 오류가 발생했습니다.'
+            : 'An error occurred while generating the recommendation.'),
       )
     } finally {
       setLoading(false)
@@ -591,6 +611,7 @@ export default function MainPage() {
                   <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">
                     {isKo ? 'AI 미리보기' : 'AI Preview'}
                   </p>
+
                   <div className="mt-4 space-y-3">
                     {previewMoments.map((item, idx) => (
                       <div
@@ -627,6 +648,7 @@ export default function MainPage() {
                     <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">
                       {isKo ? '선택한 테마' : 'Selected Themes'}
                     </p>
+
                     <div className="mt-4 flex flex-wrap gap-2">
                       {activeThemeTitles.length > 0 ? (
                         activeThemeTitles.map((themeTitle, idx) => (
@@ -649,6 +671,7 @@ export default function MainPage() {
                     <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">
                       {isKo ? '서울 공공데이터 활용' : 'Using Seoul Public Data'}
                     </p>
+
                     <div className="mt-4 space-y-3">
                       {loadingTips.map((tip, idx) => (
                         <div
@@ -685,19 +708,35 @@ export default function MainPage() {
 
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">{t.appName}</p>
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
+            </p>
             <p className="text-xs text-slate-500">{t.appSubtitle}</p>
-          </div>
+          </button>
 
           <nav className="hidden items-center gap-8 md:flex">
-            <a href="#intro" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+            <a
+              href="#intro"
+              className="text-sm font-medium text-slate-600 transition hover:text-blue-600"
+            >
               {t.serviceIntro}
             </a>
-            <a href="#theme" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+            <a
+              href="#theme"
+              className="text-sm font-medium text-slate-600 transition hover:text-blue-600"
+            >
               {t.themeSelect}
             </a>
-            <a href="#recommend" className="text-sm font-medium text-slate-600 transition hover:text-blue-600">
+            <a
+              href="#recommend"
+              className="text-sm font-medium text-slate-600 transition hover:text-blue-600"
+            >
               {t.recommendMethod}
             </a>
           </nav>
@@ -1109,6 +1148,7 @@ export default function MainPage() {
                         >
                           {loading ? t.recommending : t.finalRecommend}
                         </button>
+
                         <button
                           type="button"
                           onClick={() => setShowPlanner(false)}
@@ -1184,6 +1224,7 @@ export default function MainPage() {
                 >
                   {t.startRecommend}
                 </button>
+
                 {currentUser && (
                   <button
                     onClick={handleGoMyTrips}
@@ -1200,10 +1241,18 @@ export default function MainPage() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div>
-            <p className="text-lg font-black text-slate-900">{t.appName}</p>
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-lg font-black text-slate-900 transition group-hover:text-blue-700">
+              {logoText}
+            </p>
             <p className="mt-1 text-sm text-slate-500">{t.footerDesc}</p>
-          </div>
+          </button>
+
           <div className="flex flex-wrap gap-4 text-sm text-slate-500">
             <a href="#" className="hover:text-blue-600">
               {t.privacy}

@@ -6,8 +6,9 @@ import LanguageToggle from '../components/LanguageToggle'
 export default function ResultPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { language, t } = useLanguage()
+  const { language } = useLanguage()
   const isKo = language === 'ko'
+  const logoText = 'Seoul Life Travel'
 
   const [resultData, setResultData] = useState(location.state?.resultData || null)
   const [requestInfo, setRequestInfo] = useState(location.state?.requestInfo || null)
@@ -16,6 +17,17 @@ export default function ResultPage() {
     location.state?.publicDataCandidates || null,
   )
   const [tripId, setTripId] = useState(location.state?.tripId || null)
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
 
   const copy = useMemo(
     () => ({
@@ -251,13 +263,22 @@ export default function ResultPage() {
       <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl rounded-[32px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">
-              {txt.noResultBadge}
-            </p>
+            <button
+              type="button"
+              onClick={handleLogoClick}
+              className="group text-left"
+              aria-label="Go to home"
+            >
+              <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+                {logoText}
+              </p>
+              <p className="text-xs text-slate-500">{txt.noResultBadge}</p>
+            </button>
+
             <LanguageToggle />
           </div>
 
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+          <h1 className="mt-8 text-3xl font-black tracking-tight text-slate-900">
             {txt.noResultTitle}
           </h1>
           <p className="mt-4 text-slate-600">{txt.noResultDesc}</p>
@@ -279,14 +300,17 @@ export default function ResultPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">
-              {t.appName || 'Seoul Like Local'}
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
             </p>
-            <p className="text-xs text-slate-500">
-              {t.appSubtitle || txt.appSubtitle}
-            </p>
-          </div>
+            <p className="text-xs text-slate-500">{txt.appSubtitle}</p>
+          </button>
 
           <div className="flex items-center gap-3">
             <LanguageToggle />
@@ -392,7 +416,8 @@ export default function ResultPage() {
                     {txt.weatherTitle}
                   </h2>
                   <p className="mt-3 text-slate-600">
-                    {weatherData?.target_area || (isKo ? '서울' : 'Seoul')} {txt.weatherDescPrefix}
+                    {weatherData?.target_area || (isKo ? '서울' : 'Seoul')}{' '}
+                    {txt.weatherDescPrefix}
                     {weatherLocation?.name ? ` (${weatherLocation.name})` : ''}
                   </p>
                 </div>
@@ -493,7 +518,9 @@ export default function ResultPage() {
                         </div>
 
                         <div className="rounded-2xl bg-white px-4 py-3 text-right ring-1 ring-slate-200">
-                          <p className="text-xs font-semibold text-slate-500">{txt.estimatedCost}</p>
+                          <p className="text-xs font-semibold text-slate-500">
+                            {txt.estimatedCost}
+                          </p>
                           <p className="mt-1 text-lg font-black text-slate-900">
                             {Number(item.estimated_cost || 0).toLocaleString()} {txt.won}
                           </p>
@@ -549,7 +576,8 @@ export default function ResultPage() {
                     <h4 className="mt-1 text-lg font-black text-slate-900">{item.title}</h4>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{item.reason}</p>
                     <p className="mt-3 text-xs text-slate-500">
-                      {txt.estimatedCost}: {Number(item.estimated_cost || 0).toLocaleString()} {txt.won}
+                      {txt.estimatedCost}: {Number(item.estimated_cost || 0).toLocaleString()}{' '}
+                      {txt.won}
                     </p>
                   </div>
                 ))}

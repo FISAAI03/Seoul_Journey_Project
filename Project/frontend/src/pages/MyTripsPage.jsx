@@ -5,12 +5,47 @@ import LanguageToggle from '../components/LanguageToggle'
 
 export default function MyTripsPage() {
   const navigate = useNavigate()
-  const { language, t } = useLanguage()
+  const { language } = useLanguage()
   const isKo = language === 'ko'
+  const logoText = 'Seoul Life Travel'
 
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
+
+  const getApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL
+
+    if (envBase) {
+      return envBase.replace(/\/$/, '')
+    }
+
+    return window.location.origin
+  }
+
+  const parseJsonResponse = async (res) => {
+    const contentType = res.headers.get('content-type') || ''
+    const text = await res.text()
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `API가 JSON이 아닌 응답을 반환했습니다. status=${res.status}, body=${text.slice(0, 120)}`,
+      )
+    }
+
+    return JSON.parse(text)
+  }
 
   const copy = useMemo(
     () => ({
@@ -97,6 +132,7 @@ export default function MyTripsPage() {
         }
 
         let parsedUser
+
         try {
           parsedUser = JSON.parse(user)
         } catch (parseError) {
@@ -114,19 +150,12 @@ export default function MyTripsPage() {
           return
         }
 
-        const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+        const apiBase = getApiBase()
         const res = await fetch(`${apiBase}/api/trips/${parsedUser.id}`)
-
-        let data
-        try {
-          data = await res.json()
-        } catch (jsonError) {
-          console.error('response json parse error:', jsonError)
-          throw new Error(txt.invalidResponse)
-        }
+        const data = await parseJsonResponse(res)
 
         if (!res.ok || !data.success) {
-          throw new Error(data.message || txt.loadFailDefault)
+          throw new Error(data.message || data.error || txt.loadFailDefault)
         }
 
         setTrips(Array.isArray(data.trips) ? data.trips : [])
@@ -154,12 +183,17 @@ export default function MyTripsPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">
-              {t.appName || 'Seoul Like Local'}
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
             </p>
             <p className="text-xs text-slate-500">{txt.pageSubtitle}</p>
-          </div>
+          </button>
 
           <div className="flex items-center gap-3">
             <LanguageToggle />
@@ -180,12 +214,12 @@ export default function MyTripsPage() {
             <p className="inline-flex rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
               {txt.heroBadge}
             </p>
+
             <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
               {txt.heroTitle}
             </h1>
-            <p className="mt-3 max-w-2xl text-white/85">
-              {txt.heroDesc}
-            </p>
+
+            <p className="mt-3 max-w-2xl text-white/85">{txt.heroDesc}</p>
           </div>
         </section>
 
@@ -200,6 +234,7 @@ export default function MyTripsPage() {
           <div className="rounded-[28px] border border-red-200 bg-red-50 p-6">
             <p className="text-lg font-bold text-red-700">{txt.failTitle}</p>
             <p className="mt-2 text-red-600">{error}</p>
+
             <button
               onClick={() => navigate('/')}
               className="mt-5 rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700"
@@ -213,6 +248,7 @@ export default function MyTripsPage() {
           <div className="rounded-[28px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
             <p className="text-lg font-bold text-slate-900">{txt.emptyTitle}</p>
             <p className="mt-2 text-slate-600">{txt.emptyDesc}</p>
+
             <button
               onClick={() => navigate('/')}
               className="mt-6 rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700"
@@ -235,6 +271,7 @@ export default function MyTripsPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
                       {txt.savedTrip}
                     </p>
+
                     <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900">
                       {trip.title || txt.defaultTitle}
                     </h2>
@@ -278,7 +315,7 @@ export default function MyTripsPage() {
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4">
                   <p className="text-xs font-semibold text-slate-500">{txt.tasteInput}</p>
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">
-                    {trip.query_text || '-'}
+                    {trip.query_text || trip.merged_query || '-'}
                   </p>
                 </div>
 

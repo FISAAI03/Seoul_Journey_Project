@@ -27,6 +27,19 @@ export default function RefineTripPage() {
   const [error, setError] = useState('')
   const [progressValue, setProgressValue] = useState(12)
 
+  const logoText = 'Seoul Life Travel'
+
+  const handleLogoClick = () => {
+    navigate('/')
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 50)
+  }
+
   const getApiBase = () => {
     const envBase = import.meta.env.VITE_API_BASE_URL
 
@@ -35,6 +48,19 @@ export default function RefineTripPage() {
     }
 
     return window.location.origin
+  }
+
+  const parseJsonResponse = async (res) => {
+    const contentType = res.headers.get('content-type') || ''
+    const text = await res.text()
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `API가 JSON이 아닌 응답을 반환했습니다. status=${res.status}, body=${text.slice(0, 120)}`,
+      )
+    }
+
+    return JSON.parse(text)
   }
 
   useEffect(() => {
@@ -65,7 +91,7 @@ export default function RefineTripPage() {
 
         const apiBase = getApiBase()
         const res = await fetch(`${apiBase}/api/trip/${id}/refine-options`)
-        const data = await res.json()
+        const data = await parseJsonResponse(res)
 
         if (!res.ok || !data.success) {
           throw new Error(data.message || data.error || '재구성 정보를 불러오지 못했습니다.')
@@ -215,7 +241,7 @@ export default function RefineTripPage() {
         body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       console.log('refine response:', data)
 
       if (!res.ok || !data.success) {
@@ -297,7 +323,19 @@ export default function RefineTripPage() {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
         <div className="mx-auto max-w-5xl rounded-[32px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-          <p className="text-xl font-black">코스 재구성 준비 중입니다...</p>
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
+            </p>
+            <p className="text-xs text-slate-500">AI 코스 재구성</p>
+          </button>
+
+          <p className="mt-8 text-xl font-black">코스 재구성 준비 중입니다...</p>
           <p className="mt-2 text-slate-600">저장된 코스와 대체 후보를 불러오고 있어요.</p>
         </div>
       </div>
@@ -308,7 +346,19 @@ export default function RefineTripPage() {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
         <div className="mx-auto max-w-5xl rounded-[32px] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-          <p className="text-xl font-black text-red-700">재구성 정보를 불러오지 못했습니다.</p>
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
+            </p>
+            <p className="text-xs text-slate-500">AI 코스 재구성</p>
+          </button>
+
+          <p className="mt-8 text-xl font-black text-red-700">재구성 정보를 불러오지 못했습니다.</p>
           <p className="mt-2 text-slate-600">{error}</p>
           <button
             onClick={() => navigate('/my-trips')}
@@ -373,10 +423,17 @@ export default function RefineTripPage() {
 
       <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xl font-black tracking-tight text-blue-700">Seoul Like Local</p>
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="group text-left"
+            aria-label="Go to home"
+          >
+            <p className="text-xl font-black tracking-tight text-blue-700 transition group-hover:text-blue-800">
+              {logoText}
+            </p>
             <p className="text-xs text-slate-500">AI 코스 재구성</p>
-          </div>
+          </button>
 
           <div className="flex items-center gap-3">
             <button
